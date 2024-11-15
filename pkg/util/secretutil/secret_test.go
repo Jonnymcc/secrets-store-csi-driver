@@ -267,17 +267,6 @@ func TestGetSecretData(t *testing.T) {
 			expectedError:   true,
 		},
 		{
-			name: "key not set",
-			secretObjData: []*secretsstorev1.SecretObjectData{
-				{
-					ObjectName: "obj1",
-				},
-			},
-			secretType:      corev1.SecretTypeOpaque,
-			expectedDataMap: make(map[string][]byte),
-			expectedError:   true,
-		},
-		{
 			name: "file matching object doesn't exist in map",
 			secretObjData: []*secretsstorev1.SecretObjectData{
 				{
@@ -312,7 +301,7 @@ func TestGetSecretData(t *testing.T) {
 				},
 			},
 			secretType:      corev1.SecretTypeOpaque,
-			currentFiles:    map[string]string{"obj1": ""},
+			currentFiles:    map[string]string{"obj1": "test"},
 			expectedDataMap: map[string][]byte{"file1": []byte("test")},
 			expectedError:   false,
 		},
@@ -325,7 +314,7 @@ func TestGetSecretData(t *testing.T) {
 				},
 			},
 			secretType:      corev1.SecretTypeOpaque,
-			currentFiles:    map[string]string{"obj1": ""},
+			currentFiles:    map[string]string{"obj1": "test"},
 			expectedDataMap: map[string][]byte{"file1": []byte("test")},
 			expectedError:   false,
 		},
@@ -338,16 +327,28 @@ func TestGetSecretData(t *testing.T) {
 				},
 			},
 			secretType:      corev1.SecretTypeOpaque,
-			currentFiles:    map[string]string{"obj1": ""},
+			currentFiles:    map[string]string{"obj1": "test"},
 			expectedDataMap: map[string][]byte{"file1": []byte("test")},
+			expectedError:   false,
+		},
+		{
+			name: "obj with json gets parsed correctly",
+			secretObjData: []*secretsstorev1.SecretObjectData{
+				{
+					ObjectName: "obj1",
+				},
+			},
+			secretType:      corev1.SecretTypeOpaque,
+			currentFiles:    map[string]string{"obj1": "{\"secret1\": \"secret\", \"secret2\": \"also_secret\"}"},
+			expectedDataMap: map[string][]byte{"secret1": []byte("secret"), "secret2": []byte("also_secret")},
 			expectedError:   false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			for fileName := range test.currentFiles {
-				filePath, err := createTestFile(t.TempDir(), fileName)
+			for fileName, fileContent := range test.currentFiles {
+				filePath, err := createTestFile(t.TempDir(), fileName, fileContent)
 				if err != nil {
 					t.Fatalf("expected err to be nil, got: %+v", err)
 				}
@@ -364,7 +365,7 @@ func TestGetSecretData(t *testing.T) {
 	}
 }
 
-func createTestFile(tmpDir, fileName string) (string, error) {
+func createTestFile(tmpDir, fileName string, content string) (string, error) {
 	if fileName != "" {
 		filePath := fmt.Sprintf("%s/%s", tmpDir, fileName)
 		f, err := os.Create(filePath)
@@ -377,7 +378,7 @@ func createTestFile(tmpDir, fileName string) (string, error) {
 		if err != nil {
 			return filePath, err
 		}
-		_, err = f.WriteString("test")
+		_, err = f.WriteString(content)
 		if err != nil {
 			return filePath, err
 		}

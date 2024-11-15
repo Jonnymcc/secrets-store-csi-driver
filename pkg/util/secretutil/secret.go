@@ -21,6 +21,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -192,9 +193,6 @@ func GetSecretData(secretObjData []*secretsstorev1.SecretObjectData, secretType 
 		if len(objectName) == 0 {
 			return datamap, fmt.Errorf("object name in secretObjects.data")
 		}
-		if len(dataKey) == 0 {
-			return datamap, fmt.Errorf("key in secretObjects.data is empty")
-		}
 		file, ok := files[objectName]
 		if !ok {
 			return datamap, fmt.Errorf("file matching objectName %s not found in the pod", objectName)
@@ -203,7 +201,20 @@ func GetSecretData(secretObjData []*secretsstorev1.SecretObjectData, secretType 
 		if err != nil {
 			return datamap, fmt.Errorf("failed to read file %s, err: %w", objectName, err)
 		}
-		datamap[dataKey] = content
+
+		if len(dataKey) == 0 {
+			var jsonData map[string]string
+			err := json.Unmarshal([]byte(content), &jsonData)
+			if err != nil {
+				return datamap, fmt.Errorf("unable to parse JSON from file %s, err: %w", objectName, err)
+			}
+			for key, value := range jsonData {
+				datamap[key] = []byte(value)
+			}
+		} else {
+			datamap[dataKey] = content
+		}
+
 		if secretType == corev1.SecretTypeTLS {
 			c, err := GetCertPart(content, dataKey)
 			if err != nil {
